@@ -20,7 +20,7 @@ class SentinelSLC:
         )  # /home/tq/tq-data0*/sentinel1/*/*.zip
 
         self.local_path = os.path.join(
-            self.home_dir, "tq-tmp", process_path.split("/S1")[0]
+            self.home_dir, settings.temp_folder, process_path.split("/S1")[0]
         )  # /home/tq/tq-tmp/tq-data0*/sentinel1/*
 
         self.result_file_part.append(
@@ -63,7 +63,7 @@ class SentinelSLC:
         """
         # check the result
         for tmp_server in self.server_list:
-            tmp_path = os.path.join(self.home_dir, tmp_server, self.result_file_part3)
+            tmp_path = os.path.join(self.home_dir, tmp_server, self.result_file_part[2])
             if os.path.exists(tmp_path):
                 return os.path.split(tmp_path)[0], True
             else:
@@ -113,27 +113,34 @@ class SentinelSLC:
         """
         os.chdir(self.local_path)
         part_xml = [
-            self.local_path + settings.xml_file_names[i]
-            for i in range(settings.parts_num)
+            os.path.join(self.local_path, settings.xml_file_names[index])
+            for index in range(settings.parts_num)
         ]
-
-        for index in range(settings.parts_num):
-            part_result_path = os.path.join(
+        part_result_path = [
+            os.path.join(
                 self.local_path, os.path.split(self.result_file_part[index])[-1]
             )
+            for index in range(settings.parts_num)
+        ]
+        part_result_path.insert(0, self.process_file)
+        print(part_xml)
+        print(part_result_path)
+
+        for index in range(settings.parts_num):
             base_part_xml = os.path.join(
                 self.SLC_aux_dir, settings.base_xml_files[index]
             )
+            print(base_part_xml)
 
             tree = ET.ElementTree(file=base_part_xml)
             root = tree.getroot()
 
             for child in root.iter(tag="file"):  # set new xml for process
                 if child.text == "process_file":
-                    child.text = self.process_file
+                    child.text = part_result_path[index]
                     continue
                 elif child.text == "result_file":
-                    child.text = part_result_path
+                    child.text = part_result_path[index + 1]
                     continue
                 else:
                     print("Cannot find node, please check the xml file:", base_part_xml)
@@ -141,8 +148,10 @@ class SentinelSLC:
             try:
                 tree.write(part_xml[index])
             except Exception as e:
-                print(e)
+                print("write xml failed:", part_xml[index])
                 return None, False
+
+        return part_xml, True
 
     def gpt_process(self, process_xml) -> (str, bool):
         """
@@ -195,7 +204,9 @@ class SentinelSLC:
                 )
                 return None, False
 
-    def go_process(self) -> int:
+        return 'haha', True
+
+    def preprocess(self) -> int:
         """
         Function:
             ****************sentinel1 SLC preprocess****************
@@ -230,6 +241,7 @@ class SentinelSLC:
             print("Step 3: will be creat process xml!")
 
         # Step 3
+
         process_xml, flag = self.creat_process_xml()
         if not flag:
             process_status = 3
@@ -254,11 +266,10 @@ if __name__ == "__main__":
     start = time.time()
 
     result_root = "tq-data04"
-    process_file = "tq-data04/sentinel1/32/\
-    S1A_IW_SLC__1SDV_20180519T214846_20180519T214913_021979_025FBA_EFB1.zip"
+    process_file = "tq-data04/sentinel1/32/S1A_IW_SLC__1SDV_20180519T214846_20180519T214913_021979_025FBA_EFB1.zip"
 
     SLC = SentinelSLC(process_file, result_root)
-    flag = SLC.go_process()
+    flag = SLC.preprocess()
     print("process_status:", flag)
     end = time.time()
     print("Task runs %0.2f seconds" % (end - start))
